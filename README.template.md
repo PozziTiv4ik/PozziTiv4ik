@@ -55,11 +55,7 @@ I am currently learning in public through developer tooling, coding-agent evalua
 
 Real changes accepted into projects I did not own:
 
-| Project | Merged contribution | Date |
-|---|---|---:|
-| [mloda-ai/mloda](https://github.com/mloda-ai/mloda) | [test: cover execution plan error branches](https://github.com/mloda-ai/mloda/pull/1133) | 2026-08-16 |
-| [wingfoil-io/wingfoil](https://github.com/wingfoil-io/wingfoil) | [feat(ops): add skip combinator](https://github.com/wingfoil-io/wingfoil/pull/846) | 2026-08-15 |
-| [bruits/satteri](https://github.com/bruits/satteri) | [test(parser): lock blockquote child positions](https://github.com/bruits/satteri/pull/247) | 2026-08-15 |
+{{RECENT_MERGES}}
 
 ## How I work
 
@@ -90,4 +86,4 @@ This is my contribution board reimagined as a game of **Minesweeper**. The field
   <img src="./assets/minesweeper.svg" width="100%" alt="Animated contribution Minesweeper board" />
 </p>
 
-<sub>Profile metrics and the minefield refresh automatically from public GitHub data. Last refresh: 2026-08-16 UTC.</sub>
+<sub>Profile metrics and the minefield refresh automatically from public GitHub data. Last refresh: {{UPDATED_AT}}.</sub>

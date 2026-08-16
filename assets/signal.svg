@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="165" viewBox="0 0 1200 165" role="img" aria-labelledby="title desc">
+  <title id="title">Live GitHub signal for PozziTiv4ik</title>
+  <desc id="desc">3 merged pull requests, 5 open pull requests, 20 public repositories, and 325 public contributions in the last twelve months.</desc>
+  <style>
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .label{font:700 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:1.1px;fill:#8190a8}
+    .value{font:900 31px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  </style>
+  <rect width="1200" height="165" rx="20" fill="#0b1020"/>
+  <rect x="1" y="1" width="1198" height="163" rx="19" fill="none" stroke="#293548"/>
+  <text x="30" y="29" class="mono" font-size="13" font-weight="700" fill="#64748b">LIVE GITHUB SIGNAL · 2026-08-16 UTC</text>
+  <g transform="translate(30 47)"><rect width="270" height="94" rx="14" fill="#111827" stroke="#293548"/><rect width="5" height="94" rx="2.5" fill="#4ade80"/><text x="24" y="34" class="label">MERGED UPSTREAM</text><text x="24" y="73" class="value" fill="#4ade80">3</text></g><g transform="translate(320 47)"><rect width="270" height="94" rx="14" fill="#111827" stroke="#293548"/><rect width="5" height="94" rx="2.5" fill="#22d3ee"/><text x="24" y="34" class="label">OPEN PULL REQUESTS</text><text x="24" y="73" class="value" fill="#22d3ee">5</text></g><g transform="translate(610 47)"><rect width="270" height="94" rx="14" fill="#111827" stroke="#293548"/><rect width="5" height="94" rx="2.5" fill="#a78bfa"/><text x="24" y="34" class="label">PUBLIC REPOSITORIES</text><text x="24" y="73" class="value" fill="#a78bfa">20</text></g><g transform="translate(900 47)"><rect width="270" height="94" rx="14" fill="#111827" stroke="#293548"/><rect width="5" height="94" rx="2.5" fill="#fbbf24"/><text x="24" y="34" class="label">CONTRIBUTIONS / 12MO</text><text x="24" y="73" class="value" fill="#fbbf24">325</text></g>
+</svg>

@@ -1,0 +1,56 @@
+name: Refresh profile
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - README.template.md
+      - scripts/generate_profile.py
+      - .github/workflows/refresh-profile.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-profile
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out profile source
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Generate README and SVG assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/generate_profile.py
+
+      - name: Validate generated SVG
+        run: >-
+          python -c "import xml.etree.ElementTree as ET;
+          [ET.parse(path) for path in
+          ('assets/header.svg', 'assets/signal.svg', 'assets/minesweeper.svg')]"
+
+      - name: Publish refreshed profile
+        run: |
+          if git diff --quiet; then
+            echo "Profile is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md assets/signal.svg assets/minesweeper.svg
+          git commit -m "chore: refresh profile signal"
+          git push
