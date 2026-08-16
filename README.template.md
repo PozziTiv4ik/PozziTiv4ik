@@ -80,7 +80,7 @@ idea → smallest useful change → regression proof → CI → maintainer feedb
 
 ## Contribution minefield
 
-This is my contribution board reimagined as a game of **Minesweeper**. The field and scoreboard are generated from live public GitHub activity; safe cells reveal in a wave while shipped work gets flagged.
+This is my contribution board reimagined as a game of **Minesweeper**. A tiny player picks safe cells, triggers three reveal cascades, spots a dangerous square, plants flags, clears the mine counter, and celebrates the win. The board and scoreboard are generated from live public GitHub activity.
 
 <p align="center">
   <img src="./assets/minesweeper.svg" width="100%" alt="Animated contribution Minesweeper board" />

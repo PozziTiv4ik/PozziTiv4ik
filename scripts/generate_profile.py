@@ -234,6 +234,8 @@ def neighboring_mines(
 
 
 def render_minesweeper_svg(metrics: Metrics) -> str:
+    cycle = 24.0
+    reset_at = 21.2
     cols, rows = 28, 7
     cell, gap = 31, 4
     board_width = cols * cell + (cols - 1) * gap
@@ -254,58 +256,281 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
         8: "#94a3b8",
     }
 
+    def point_position(point: tuple[int, int]) -> tuple[float, float]:
+        x, y = point
+        return (
+            board_x + x * (cell + gap) + cell / 2,
+            board_y + y * (cell + gap) + cell / 2,
+        )
+
+    def animation_times(*seconds: float) -> str:
+        return ";".join(f"{min(1, max(0, value / cycle)):.4f}" for value in seconds)
+
+    def reveal_animation(reveal_at: float, *, inverted: bool) -> str:
+        before = max(0, reveal_at - 0.16)
+        after_reset = min(cycle, reset_at + 0.38)
+        values = "0;0;1;1;0;0" if inverted else "1;1;0;0;1;1"
+        return (
+            f'<animate attributeName="opacity" values="{values}" '
+            f'keyTimes="{animation_times(0, before, reveal_at, reset_at, after_reset, cycle)}" '
+            f'dur="{cycle:g}s" repeatCount="indefinite"/>'
+        )
+
+    def stage_animation(start: float, end: float) -> str:
+        if start == 0:
+            return (
+                '<animate attributeName="opacity" values="1;1;0;0" '
+                f'keyTimes="{animation_times(0, end, end + 0.18, cycle)}" '
+                f'dur="{cycle:g}s" repeatCount="indefinite"/>'
+            )
+        return (
+            '<animate attributeName="opacity" values="0;0;1;1;0;0" '
+            f'keyTimes="{animation_times(0, start - 0.18, start, end, end + 0.18, cycle)}" '
+            f'dur="{cycle:g}s" repeatCount="indefinite"/>'
+        )
+
     safe_cells = [
         (x, y) for y in range(rows) for x in range(cols) if (x, y) not in mines
     ]
+    counts = {
+        point: neighboring_mines(*point, mines, cols, rows) for point in safe_cells
+    }
+    zero_cells = [point for point in safe_cells if counts[point] == 0]
+
+    click_aims = ((2, 3), (14, 1), (24, 5))
+    click_cells: list[tuple[int, int]] = []
+    for aim_x, aim_y in click_aims:
+        candidates = [point for point in zero_cells if point not in click_cells]
+        if not candidates:
+            candidates = [point for point in safe_cells if point not in click_cells]
+        click_cells.append(
+            min(
+                candidates,
+                key=lambda point: (point[0] - aim_x) ** 2 + (point[1] - aim_y) ** 2,
+            )
+        )
+
+    mine_regions = (
+        sorted(
+            (point for point in mines if point[0] < 9),
+            key=lambda point: (point[1], point[0]),
+        ),
+        sorted(
+            (point for point in mines if 9 <= point[0] < 19),
+            key=lambda point: (point[1], point[0]),
+        ),
+        sorted(
+            (point for point in mines if point[0] >= 19),
+            key=lambda point: (point[1], point[0]),
+        ),
+    )
+    flag_cells = [
+        min(
+            region or tuple(mines),
+            key=lambda point: (point[0] - aim[0]) ** 2 + (point[1] - aim[1]) ** 2,
+        )
+        for region, aim in zip(mine_regions, ((6, 2), (15, 4), (23, 2)), strict=True)
+    ]
+
     jitter_seed = int.from_bytes(
         hashlib.sha256(f"{USERNAME}:reveal".encode()).digest()[:8], "big"
     )
     jitter = random.Random(jitter_seed)
-    safe_cells.sort(key=lambda point: point[0] + point[1] * 1.7 + jitter.random() * 1.8)
-    reveal_index = {point: index for index, point in enumerate(safe_cells)}
+    cascade_starts = (1.6, 6.3, 13.1)
+    reveal_at: dict[tuple[int, int], float] = {}
+    for point in safe_cells:
+        phase = min(
+            range(len(click_cells)),
+            key=lambda index: (
+                (point[0] - click_cells[index][0]) ** 2
+                + (point[1] - click_cells[index][1]) ** 2
+            ),
+        )
+        distance = (
+            (point[0] - click_cells[phase][0]) ** 2
+            + (point[1] - click_cells[phase][1]) ** 2
+        ) ** 0.5
+        reveal_at[point] = (
+            cascade_starts[phase] + distance * 0.16 + jitter.random() * 0.12
+        )
+
+    flag_starts = (4.45, 9.65, 11.95)
+    mine_reveal_at: dict[tuple[int, int], float] = {}
+    for phase, region in enumerate(mine_regions):
+        for index, point in enumerate(region):
+            mine_reveal_at[point] = flag_starts[phase] + index * 0.075
 
     cells: list[str] = []
-    flag_index = 0
     for y in range(rows):
         for x in range(cols):
             px = board_x + x * (cell + gap)
             py = board_y + y * (cell + gap)
             base = f'<rect x="{px}" y="{py}" width="{cell}" height="{cell}" rx="4" class="open-cell"/>'
             if (x, y) in mines:
-                delay = 5.4 + flag_index * 0.075
-                flag_index += 1
+                flag_at = mine_reveal_at[(x, y)]
                 cells.append(
                     f"<g>{base}"
                     f'<rect x="{px}" y="{py}" width="{cell}" height="{cell}" rx="4" class="mine-cover"/>'
                     f'<g class="flag" opacity="0" transform="translate({px + 8} {py + 6})">'
                     '<path d="M3 20V2m0 2h14l-4.5 5L17 14H3" fill="#4ade80" stroke="#86efac" stroke-width="1.6" stroke-linejoin="round"/>'
                     '<path d="M0 23h10" stroke="#86efac" stroke-width="2" stroke-linecap="round"/>'
-                    f'<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;.05;.12;.72;.88;1" dur="20s" begin="{delay:.3f}s" repeatCount="indefinite"/>'
+                    f"{reveal_animation(flag_at, inverted=True)}"
                     "</g></g>"
                 )
                 continue
 
-            count = neighboring_mines(x, y, mines, cols, rows)
-            delay = 0.5 + reveal_index[(x, y)] * 0.027
+            count = counts[(x, y)]
+            cell_reveal = reveal_at[(x, y)]
             content = ""
             if count:
                 color = number_colors[count]
                 content = (
                     f'<text x="{px + cell / 2:.1f}" y="{py + 22}" text-anchor="middle" '
                     f'class="number safe-content" fill="{color}" opacity="0">{count}'
-                    f'<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;.05;.12;.72;.88;1" dur="20s" begin="{delay:.3f}s" repeatCount="indefinite"/>'
+                    f"{reveal_animation(cell_reveal, inverted=True)}"
                     "</text>"
                 )
             cells.append(
                 f"<g>{base}{content}"
                 f'<rect x="{px}" y="{py}" width="{cell}" height="{cell}" rx="4" class="cover">'
-                f'<animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;.05;.12;.72;.88;1" dur="20s" begin="{delay:.3f}s" repeatCount="indefinite"/>'
+                f"{reveal_animation(cell_reveal, inverted=False)}"
                 "</rect>"
                 "</g>"
             )
 
+    click_pulses: list[str] = []
+    for point, pulse_at in zip(click_cells, cascade_starts, strict=True):
+        cx, cy = point_position(point)
+        click_pulses.append(
+            f'<circle class="pulse" cx="{cx:.1f}" cy="{cy:.1f}" r="4" fill="none" stroke="#22d3ee" stroke-width="3" opacity="0">'
+            '<animate attributeName="opacity" values="0;0;1;0;0" '
+            f'keyTimes="{animation_times(0, pulse_at, pulse_at + 0.08, pulse_at + 0.72, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
+            '<animate attributeName="r" values="4;4;7;30;30" '
+            f'keyTimes="{animation_times(0, pulse_at, pulse_at + 0.08, pulse_at + 0.72, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
+            "</circle>"
+        )
+
+    flag_pulses: list[str] = []
+    for point, pulse_at in zip(flag_cells, flag_starts, strict=True):
+        cx, cy = point_position(point)
+        flag_pulses.append(
+            f'<circle class="pulse" cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="#4ade80" opacity="0">'
+            '<animate attributeName="opacity" values="0;0;1;0;0" '
+            f'keyTimes="{animation_times(0, pulse_at, pulse_at + 0.08, pulse_at + 0.55, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
+            '<animate attributeName="r" values="5;5;12;22;22" '
+            f'keyTimes="{animation_times(0, pulse_at, pulse_at + 0.08, pulse_at + 0.55, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
+            "</circle>"
+        )
+
+    danger_cell = flag_cells[2]
+    danger_x = board_x + danger_cell[0] * (cell + gap)
+    danger_y = board_y + danger_cell[1] * (cell + gap)
+    danger_pulse = (
+        f'<rect class="pulse" x="{danger_x - 3}" y="{danger_y - 3}" width="{cell + 6}" height="{cell + 6}" rx="7" '
+        'fill="#fb7185" fill-opacity=".12" stroke="#fb7185" stroke-width="3" opacity="0">'
+        '<animate attributeName="opacity" values="0;0;1;.25;1;.25;0;0" '
+        f'keyTimes="{animation_times(0, 10.85, 11.0, 11.25, 11.5, 11.75, 12.05, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
+        "</rect>"
+    )
+
+    route_points = [
+        (board_x - 55, board_y - 38),
+        point_position(click_cells[0]),
+        point_position(click_cells[0]),
+        point_position(flag_cells[0]),
+        point_position(flag_cells[0]),
+        point_position(click_cells[1]),
+        point_position(click_cells[1]),
+        point_position(flag_cells[1]),
+        point_position(flag_cells[1]),
+        point_position(danger_cell),
+        point_position(danger_cell),
+        point_position(danger_cell),
+        point_position(click_cells[2]),
+        point_position(click_cells[2]),
+        (board_x + board_width + 45, board_y + rows * (cell + gap) - 20),
+        (board_x + board_width + 70, board_y - 40),
+        (board_x + board_width + 70, board_y - 40),
+        (board_x - 55, board_y - 38),
+    ]
+    route_times = (
+        0,
+        1.42,
+        1.9,
+        4.2,
+        4.75,
+        6.08,
+        6.65,
+        9.35,
+        9.92,
+        10.85,
+        11.55,
+        12.2,
+        12.92,
+        13.55,
+        16.2,
+        17.05,
+        reset_at,
+        cycle,
+    )
+    route_values = ";".join(f"{x:.1f} {y:.1f}" for x, y in route_points)
+
+    route_path = "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in route_points[1:14])
+
+    stage_messages = (
+        (0.0, 1.55, "#22d3ee", "PICK A SAFE CELL"),
+        (1.55, 4.4, "#22d3ee", "CASCADE 01 // CLEAR"),
+        (4.4, 6.2, "#4ade80", "FLAGS PLANTED // KEEP MOVING"),
+        (6.2, 9.55, "#22d3ee", "CASCADE 02 // CLEAR"),
+        (9.55, 12.15, "#fb7185", "MINE DETECTED // BACK OFF"),
+        (12.15, 16.45, "#a78bfa", "FINAL CASCADE // COMMIT"),
+        (16.45, 20.8, "#4ade80", "FIELD CLEARED // KEEP SHIPPING"),
+        (20.8, cycle, "#64748b", "RESETTING BOARD..."),
+    )
+    status_markup = "".join(
+        f'<text x="44" y="121" class="stage" fill="{color}" font-size="15" font-weight="700" opacity="0">&gt; {message}'
+        f"{stage_animation(start, end)}</text>"
+        for start, end, color, message in stage_messages
+    )
+
+    region_counts = [len(region) for region in mine_regions]
+    counter_values = (
+        (0.0, flag_starts[0], mine_count),
+        (flag_starts[0], flag_starts[1], mine_count - region_counts[0]),
+        (
+            flag_starts[1],
+            flag_starts[2],
+            mine_count - region_counts[0] - region_counts[1],
+        ),
+        (flag_starts[2], cycle, 0),
+    )
+    counter_markup = "".join(
+        f'<text x="16" y="49" class="counter-stage" fill="#fb7185" font-size="24" font-weight="900" opacity="0">{value:03d}'
+        f"{stage_animation(start, end)}</text>"
+        for start, end, value in counter_values
+    )
+
+    confetti_rng = random.Random(jitter_seed ^ 0xC0FFEE)
+    confetti_colors = ("#4ade80", "#22d3ee", "#a78bfa", "#fbbf24", "#fb7185")
+    confetti: list[str] = []
+    for index in range(30):
+        x = confetti_rng.randint(30, 1170)
+        start = 16.3 + confetti_rng.random() * 0.9
+        end = 20.5 + confetti_rng.random() * 0.35
+        width = confetti_rng.randint(4, 9)
+        height = confetti_rng.randint(8, 16)
+        color = confetti_colors[index % len(confetti_colors)]
+        confetti.append(
+            f'<rect class="confetti" x="{x}" y="-18" width="{width}" height="{height}" rx="2" fill="{color}" opacity="0">'
+            '<animate attributeName="y" values="-18;-18;438;438" '
+            f'keyTimes="{animation_times(0, start, end, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
+            '<animate attributeName="opacity" values="0;0;1;0;0" '
+            f'keyTimes="{animation_times(0, start, start + 0.18, end, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
+            "</rect>"
+        )
+
     description = (
-        f"Animated Minesweeper board generated from {metrics.contributions} public contributions, "
+        f"A cursor plays an animated Minesweeper round generated from {metrics.contributions} public contributions, "
         f"{metrics.merged_prs} merged pull requests, and {metrics.active_days} active contribution days."
     )
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="460" viewBox="0 0 1200 460" role="img" aria-labelledby="title desc">
@@ -327,10 +552,13 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     .number{{font:900 18px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
     .open-cell{{fill:#0d1728;stroke:#1f3048;stroke-width:1}}
     .cover,.mine-cover{{fill:#26334a;stroke:#49607e;stroke-width:1.2}}
-    .cursor{{animation:cursorPulse 1.1s ease-in-out infinite alternate}}
-    @keyframes cursorPulse{{from{{opacity:.35}}to{{opacity:1}}}}
+    .player-core{{animation:playerPulse .7s ease-in-out infinite alternate}}
+    .route{{stroke-dasharray:8 11;animation:routeFlow 1s linear infinite}}
+    @keyframes playerPulse{{from{{opacity:.55}}to{{opacity:1}}}}
+    @keyframes routeFlow{{to{{stroke-dashoffset:-38}}}}
     @media (prefers-reduced-motion:reduce){{
-      .cover{{display:none}}.safe-content,.flag,.cleared{{opacity:1!important}}.scanning,.cursor{{display:none}}
+      .cover{{display:none}}.safe-content,.flag,.reduced-win,.counter-reduced{{opacity:1!important}}
+      .stage,.counter-stage,.player,.pulse,.confetti,.route{{display:none}}
     }}
   </style>
   <rect width="1200" height="460" rx="22" fill="url(#mineBg)"/>
@@ -343,8 +571,9 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
 
     <g transform="translate(650 25)">
       <rect width="150" height="61" rx="11" fill="#111827" stroke="#334155"/>
-      <text x="16" y="23" fill="#64748b" font-size="11" font-weight="700">MINES</text>
-      <text x="16" y="49" fill="#fb7185" font-size="24" font-weight="900">{mine_count:03d}</text>
+      <text x="16" y="23" fill="#64748b" font-size="11" font-weight="700">MINES LEFT</text>
+      {counter_markup}
+      <text x="16" y="49" class="counter-reduced" fill="#4ade80" font-size="24" font-weight="900" opacity="0">000</text>
       <rect x="164" width="150" height="61" rx="11" fill="#111827" stroke="#334155"/>
       <text x="180" y="23" fill="#64748b" font-size="11" font-weight="700">MERGED</text>
       <text x="180" y="49" fill="#4ade80" font-size="24" font-weight="900">{metrics.merged_prs:03d}</text>
@@ -353,19 +582,27 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
       <text x="344" y="49" fill="#22d3ee" font-size="24" font-weight="900">{metrics.contributions:04d}</text>
     </g>
 
-    <text x="44" y="121" class="scanning" fill="#22d3ee" font-size="15" font-weight="700">&gt; SCANNING SAFE CELLS...
-      <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;.34;.4;.72;.78;1" dur="20s" repeatCount="indefinite"/>
-    </text>
-    <text x="44" y="121" class="cleared" fill="#4ade80" font-size="15" font-weight="700" opacity="0">&gt; FIELD CLEARED — KEEP SHIPPING.
-      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;.34;.4;.72;.78;1" dur="20s" repeatCount="indefinite"/>
-    </text>
+    {status_markup}
+    <text x="44" y="121" class="reduced-win" fill="#4ade80" font-size="15" font-weight="700" opacity="0">&gt; FIELD CLEARED // KEEP SHIPPING</text>
   </g>
 
+  <path class="route" d="{route_path}" fill="none" stroke="#22d3ee" stroke-opacity=".12" stroke-width="2"/>
   {"".join(cells)}
+  {danger_pulse}
+  {"".join(click_pulses)}
+  {"".join(flag_pulses)}
 
-  <rect class="cursor" x="{board_x - 5}" y="{board_y - 5}" width="41" height="41" rx="7" fill="none" stroke="#22d3ee" stroke-width="2" filter="url(#cursorGlow)">
-    <animate attributeName="x" values="{board_x - 5};{board_x + board_width - 36};{board_x - 5}" dur="8s" repeatCount="indefinite"/>
+  <rect class="pulse" x="5" y="5" width="1190" height="450" rx="18" fill="none" stroke="#4ade80" stroke-width="3" opacity="0">
+    <animate attributeName="opacity" values="0;0;1;.25;0;0" keyTimes="{animation_times(0, 16.45, 16.7, 20.4, 20.8, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>
   </rect>
+  {"".join(confetti)}
+
+  <g class="player" filter="url(#cursorGlow)">
+    <circle class="player-core" r="17" fill="#22d3ee" fill-opacity=".14" stroke="#22d3ee" stroke-width="2"/>
+    <path d="M-8-13v26l7-7 7 14 7-4-7-13h11z" fill="#f8fafc" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle r="3.5" fill="#4ade80"/>
+    <animateTransform attributeName="transform" type="translate" values="{route_values}" keyTimes="{animation_times(*route_times)}" dur="{cycle:g}s" repeatCount="indefinite"/>
+  </g>
   <text x="600" y="431" text-anchor="middle" class="mono" fill="#64748b" font-size="13">Every safe click is a test. Every cleared field is a merge.</text>
 </svg>
 '''
