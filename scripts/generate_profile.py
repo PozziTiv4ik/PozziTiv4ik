@@ -29,7 +29,6 @@ class Metrics:
     contributions: int
     active_days: int
     recent_merges: tuple[dict[str, str], ...]
-    refreshed_at: str
 
 
 def request_json(url: str, *, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -133,7 +132,6 @@ def fetch_metrics() -> Metrics:
         contributions=public_contributions,
         active_days=len(days),
         recent_merges=tuple(recent),
-        refreshed_at=now.strftime("%Y-%m-%d UTC"),
     )
 
 
@@ -165,7 +163,6 @@ def render_readme(metrics: Metrics) -> str:
     template = (ROOT / "README.template.md").read_text(encoding="utf-8")
     replacements = {
         "{{RECENT_MERGES}}": render_recent_merges(metrics),
-        "{{UPDATED_AT}}": metrics.refreshed_at,
     }
     for marker, value in replacements.items():
         template = template.replace(marker, value)
@@ -176,34 +173,36 @@ def render_readme(metrics: Metrics) -> str:
 
 def render_signal_svg(metrics: Metrics) -> str:
     cards = (
-        ("MERGED UPSTREAM", metrics.merged_prs, "#4ade80"),
-        ("OPEN PULL REQUESTS", metrics.open_prs, "#22d3ee"),
-        ("PUBLIC REPOSITORIES", metrics.public_repos, "#a78bfa"),
-        ("CONTRIBUTIONS / 12MO", metrics.contributions, "#fbbf24"),
+        ("Merged upstream", metrics.merged_prs),
+        ("Open pull requests", metrics.open_prs),
+        ("Public repositories", metrics.public_repos),
+        ("Contributions", metrics.contributions),
     )
     card_markup: list[str] = []
-    for index, (label, value, color) in enumerate(cards):
-        x = 30 + index * 290
+    for index, (label, value) in enumerate(cards):
+        x = index * 290
         card_markup.append(
-            f'<g transform="translate({x} 47)">'
-            '<rect width="270" height="94" rx="14" fill="#111827" stroke="#293548"/>'
-            f'<rect width="5" height="94" rx="2.5" fill="{color}"/>'
-            f'<text x="24" y="34" class="label">{html.escape(label)}</text>'
-            f'<text x="24" y="73" class="value" fill="{color}">{value:,}</text>'
+            f'<g transform="translate({x} 0)">'
+            '<rect class="card" width="270" height="92" rx="6"/>'
+            f'<text x="18" y="34" class="label">{html.escape(label)}</text>'
+            f'<text x="18" y="70" class="value">{value:,}</text>'
             "</g>"
         )
 
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="165" viewBox="0 0 1200 165" role="img" aria-labelledby="title desc">
-  <title id="title">Live GitHub signal for {USERNAME}</title>
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="92" viewBox="0 0 1140 92" role="img" aria-labelledby="title desc">
+  <title id="title">GitHub activity for {USERNAME}</title>
   <desc id="desc">{metrics.merged_prs} merged pull requests, {metrics.open_prs} open pull requests, {metrics.public_repos} public repositories, and {metrics.contributions} public contributions in the last twelve months.</desc>
   <style>
-    .mono{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
-    .label{{font:700 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:1.1px;fill:#8190a8}}
-    .value{{font:900 31px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
+    :root{{color-scheme:light dark}}
+    .card{{fill:#f6f8fa;stroke:#d0d7de}}
+    .label{{font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#656d76}}
+    .value{{font:600 28px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#1f2328}}
+    @media(prefers-color-scheme:dark){{
+      .card{{fill:#0d1117;stroke:#30363d}}
+      .label{{fill:#8b949e}}
+      .value{{fill:#f0f6fc}}
+    }}
   </style>
-  <rect width="1200" height="165" rx="20" fill="#0b1020"/>
-  <rect x="1" y="1" width="1198" height="163" rx="19" fill="none" stroke="#293548"/>
-  <text x="30" y="29" class="mono" font-size="13" font-weight="700" fill="#64748b">LIVE GITHUB SIGNAL · {html.escape(metrics.refreshed_at)}</text>
   {"".join(card_markup)}
 </svg>
 """
@@ -240,21 +239,11 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     cell, gap = 31, 4
     board_width = cols * cell + (cols - 1) * gap
     board_x = (1200 - board_width) // 2
-    board_y = 152
+    board_y = 32
     mine_count = min(34, max(18, metrics.merged_prs + metrics.active_days + 12))
     mines = mine_positions(
         cols, rows, mine_count, f"{USERNAME}:{datetime.now(UTC).year}"
     )
-    number_colors = {
-        1: "#22d3ee",
-        2: "#4ade80",
-        3: "#fbbf24",
-        4: "#a78bfa",
-        5: "#fb7185",
-        6: "#2dd4bf",
-        7: "#f8fafc",
-        8: "#94a3b8",
-    }
 
     def point_position(point: tuple[int, int]) -> tuple[float, float]:
         x, y = point
@@ -273,19 +262,6 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
         return (
             f'<animate attributeName="opacity" values="{values}" '
             f'keyTimes="{animation_times(0, before, reveal_at, reset_at, after_reset, cycle)}" '
-            f'dur="{cycle:g}s" repeatCount="indefinite"/>'
-        )
-
-    def stage_animation(start: float, end: float) -> str:
-        if start == 0:
-            return (
-                '<animate attributeName="opacity" values="1;1;0;0" '
-                f'keyTimes="{animation_times(0, end, end + 0.18, cycle)}" '
-                f'dur="{cycle:g}s" repeatCount="indefinite"/>'
-            )
-        return (
-            '<animate attributeName="opacity" values="0;0;1;1;0;0" '
-            f'keyTimes="{animation_times(0, start - 0.18, start, end, end + 0.18, cycle)}" '
             f'dur="{cycle:g}s" repeatCount="indefinite"/>'
         )
 
@@ -372,8 +348,8 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
                     f"<g>{base}"
                     f'<rect x="{px}" y="{py}" width="{cell}" height="{cell}" rx="4" class="mine-cover"/>'
                     f'<g class="flag" opacity="0" transform="translate({px + 8} {py + 6})">'
-                    '<path d="M3 20V2m0 2h14l-4.5 5L17 14H3" fill="#4ade80" stroke="#86efac" stroke-width="1.6" stroke-linejoin="round"/>'
-                    '<path d="M0 23h10" stroke="#86efac" stroke-width="2" stroke-linecap="round"/>'
+                    '<path class="flag-cloth" d="M3 20V2m0 2h14l-4.5 5L17 14H3" stroke-width="1.6" stroke-linejoin="round"/>'
+                    '<path class="flag-pole" d="M0 23h10" stroke-width="2" stroke-linecap="round"/>'
                     f"{reveal_animation(flag_at, inverted=True)}"
                     "</g></g>"
                 )
@@ -383,10 +359,9 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
             cell_reveal = reveal_at[(x, y)]
             content = ""
             if count:
-                color = number_colors[count]
                 content = (
                     f'<text x="{px + cell / 2:.1f}" y="{py + 22}" text-anchor="middle" '
-                    f'class="number safe-content" fill="{color}" opacity="0">{count}'
+                    f'class="number n{count} safe-content" opacity="0">{count}'
                     f"{reveal_animation(cell_reveal, inverted=True)}"
                     "</text>"
                 )
@@ -402,7 +377,7 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     for point, pulse_at in zip(click_cells, cascade_starts, strict=True):
         cx, cy = point_position(point)
         click_pulses.append(
-            f'<circle class="pulse" cx="{cx:.1f}" cy="{cy:.1f}" r="4" fill="none" stroke="#22d3ee" stroke-width="3" opacity="0">'
+            f'<circle class="pulse click-pulse" cx="{cx:.1f}" cy="{cy:.1f}" r="4" fill="none" stroke-width="3" opacity="0">'
             '<animate attributeName="opacity" values="0;0;1;0;0" '
             f'keyTimes="{animation_times(0, pulse_at, pulse_at + 0.08, pulse_at + 0.72, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
             '<animate attributeName="r" values="4;4;7;30;30" '
@@ -414,7 +389,7 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     for point, pulse_at in zip(flag_cells, flag_starts, strict=True):
         cx, cy = point_position(point)
         flag_pulses.append(
-            f'<circle class="pulse" cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="#4ade80" opacity="0">'
+            f'<circle class="pulse flag-pulse" cx="{cx:.1f}" cy="{cy:.1f}" r="5" opacity="0">'
             '<animate attributeName="opacity" values="0;0;1;0;0" '
             f'keyTimes="{animation_times(0, pulse_at, pulse_at + 0.08, pulse_at + 0.55, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
             '<animate attributeName="r" values="5;5;12;22;22" '
@@ -426,8 +401,8 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     danger_x = board_x + danger_cell[0] * (cell + gap)
     danger_y = board_y + danger_cell[1] * (cell + gap)
     danger_pulse = (
-        f'<rect class="pulse" x="{danger_x - 3}" y="{danger_y - 3}" width="{cell + 6}" height="{cell + 6}" rx="7" '
-        'fill="#fb7185" fill-opacity=".12" stroke="#fb7185" stroke-width="3" opacity="0">'
+        f'<rect class="pulse danger-pulse" x="{danger_x - 3}" y="{danger_y - 3}" width="{cell + 6}" height="{cell + 6}" rx="7" '
+        'fill-opacity=".12" stroke-width="3" opacity="0">'
         '<animate attributeName="opacity" values="0;0;1;.25;1;.25;0;0" '
         f'keyTimes="{animation_times(0, 10.85, 11.0, 11.25, 11.5, 11.75, 12.05, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
         "</rect>"
@@ -477,41 +452,8 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
 
     route_path = "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in route_points[1:14])
 
-    stage_messages = (
-        (0.0, 1.55, "#22d3ee", "PICK A SAFE CELL"),
-        (1.55, 4.4, "#22d3ee", "CASCADE 01 // CLEAR"),
-        (4.4, 6.2, "#4ade80", "FLAGS PLANTED // KEEP MOVING"),
-        (6.2, 9.55, "#22d3ee", "CASCADE 02 // CLEAR"),
-        (9.55, 12.15, "#fb7185", "MINE DETECTED // BACK OFF"),
-        (12.15, 16.45, "#a78bfa", "FINAL CASCADE // COMMIT"),
-        (16.45, 20.8, "#4ade80", "FIELD CLEARED // KEEP SHIPPING"),
-        (20.8, cycle, "#64748b", "RESETTING BOARD..."),
-    )
-    status_markup = "".join(
-        f'<text x="44" y="121" class="stage" fill="{color}" font-size="15" font-weight="700" opacity="0">&gt; {message}'
-        f"{stage_animation(start, end)}</text>"
-        for start, end, color, message in stage_messages
-    )
-
-    region_counts = [len(region) for region in mine_regions]
-    counter_values = (
-        (0.0, flag_starts[0], mine_count),
-        (flag_starts[0], flag_starts[1], mine_count - region_counts[0]),
-        (
-            flag_starts[1],
-            flag_starts[2],
-            mine_count - region_counts[0] - region_counts[1],
-        ),
-        (flag_starts[2], cycle, 0),
-    )
-    counter_markup = "".join(
-        f'<text x="16" y="49" class="counter-stage" fill="#fb7185" font-size="24" font-weight="900" opacity="0">{value:03d}'
-        f"{stage_animation(start, end)}</text>"
-        for start, end, value in counter_values
-    )
-
     confetti_rng = random.Random(jitter_seed ^ 0xC0FFEE)
-    confetti_colors = ("#4ade80", "#22d3ee", "#a78bfa", "#fbbf24", "#fb7185")
+    confetti_colors = ("#3fb950", "#58a6ff", "#a371f7", "#d29922", "#f85149")
     confetti: list[str] = []
     for index in range(30):
         x = confetti_rng.randint(30, 1170)
@@ -522,7 +464,7 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
         color = confetti_colors[index % len(confetti_colors)]
         confetti.append(
             f'<rect class="confetti" x="{x}" y="-18" width="{width}" height="{height}" rx="2" fill="{color}" opacity="0">'
-            '<animate attributeName="y" values="-18;-18;438;438" '
+            '<animate attributeName="y" values="-18;-18;300;300" '
             f'keyTimes="{animation_times(0, start, end, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
             '<animate attributeName="opacity" values="0;0;1;0;0" '
             f'keyTimes="{animation_times(0, start, start + 0.18, end, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
@@ -533,77 +475,66 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
         f"A cursor plays an animated Minesweeper round generated from {metrics.contributions} public contributions, "
         f"{metrics.merged_prs} merged pull requests, and {metrics.active_days} active contribution days."
     )
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="460" viewBox="0 0 1200 460" role="img" aria-labelledby="title desc">
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="310" viewBox="0 0 1200 310" role="img" aria-labelledby="title desc">
   <title id="title">{USERNAME}'s contribution minefield</title>
   <desc id="desc">{html.escape(description)}</desc>
-  <defs>
-    <linearGradient id="mineBg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#090d18"/><stop offset=".55" stop-color="#0c1324"/><stop offset="1" stop-color="#07191a"/>
-    </linearGradient>
-    <pattern id="mineGrid" width="30" height="30" patternUnits="userSpaceOnUse">
-      <path d="M30 0H0V30" fill="none" stroke="#22d3ee" stroke-opacity=".035"/>
-    </pattern>
-    <filter id="cursorGlow" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-  </defs>
   <style>
-    .mono{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
-    .number{{font:900 18px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
-    .open-cell{{fill:#0d1728;stroke:#1f3048;stroke-width:1}}
-    .cover,.mine-cover{{fill:#26334a;stroke:#49607e;stroke-width:1.2}}
+    :root{{color-scheme:light dark}}
+    .background{{fill:#ffffff}}
+    .frame{{fill:none;stroke:#d0d7de}}
+    .number{{font:600 17px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
+    .open-cell{{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1}}
+    .cover,.mine-cover{{fill:#d8dee4;stroke:#afb8c1;stroke-width:1}}
+    .n1{{fill:#0969da}}.n2{{fill:#1a7f37}}.n3{{fill:#cf222e}}.n4{{fill:#8250df}}
+    .n5{{fill:#bc4c00}}.n6{{fill:#0a7a74}}.n7{{fill:#1f2328}}.n8{{fill:#656d76}}
+    .flag-cloth{{fill:#1a7f37;stroke:#1a7f37}}.flag-pole{{stroke:#1a7f37}}
+    .click-pulse{{stroke:#0969da}}.flag-pulse{{fill:#1a7f37}}
+    .danger-pulse{{fill:#cf222e;stroke:#cf222e}}
+    .win-pulse{{stroke:#1a7f37}}
+    .route{{stroke:#0969da}}
+    .player-core{{fill:#0969da;stroke:#0969da}}
+    .player-pointer{{fill:#ffffff;stroke:#0969da}}
+    .player-dot{{fill:#1a7f37}}
     .player-core{{animation:playerPulse .7s ease-in-out infinite alternate}}
     .route{{stroke-dasharray:8 11;animation:routeFlow 1s linear infinite}}
     @keyframes playerPulse{{from{{opacity:.55}}to{{opacity:1}}}}
     @keyframes routeFlow{{to{{stroke-dashoffset:-38}}}}
+    @media(prefers-color-scheme:dark){{
+      .background{{fill:#0d1117}}.frame{{stroke:#30363d}}
+      .open-cell{{fill:#161b22;stroke:#30363d}}
+      .cover,.mine-cover{{fill:#21262d;stroke:#30363d}}
+      .n1{{fill:#58a6ff}}.n2{{fill:#3fb950}}.n3{{fill:#f85149}}.n4{{fill:#a371f7}}
+      .n5{{fill:#d29922}}.n6{{fill:#39c5cf}}.n7{{fill:#f0f6fc}}.n8{{fill:#8b949e}}
+      .flag-cloth{{fill:#3fb950;stroke:#3fb950}}.flag-pole{{stroke:#3fb950}}
+      .click-pulse{{stroke:#58a6ff}}.flag-pulse{{fill:#3fb950}}
+      .danger-pulse{{fill:#f85149;stroke:#f85149}}.win-pulse{{stroke:#3fb950}}
+      .route{{stroke:#58a6ff}}.player-core{{fill:#58a6ff;stroke:#58a6ff}}
+      .player-pointer{{fill:#f0f6fc;stroke:#58a6ff}}.player-dot{{fill:#3fb950}}
+    }}
     @media (prefers-reduced-motion:reduce){{
-      .cover{{display:none}}.safe-content,.flag,.reduced-win,.counter-reduced{{opacity:1!important}}
-      .stage,.counter-stage,.player,.pulse,.confetti,.route{{display:none}}
+      .cover{{display:none}}.safe-content,.flag{{opacity:1!important}}
+      .player,.pulse,.confetti,.route{{display:none}}
     }}
   </style>
-  <rect width="1200" height="460" rx="22" fill="url(#mineBg)"/>
-  <rect width="1200" height="460" rx="22" fill="url(#mineGrid)"/>
-  <rect x="1" y="1" width="1198" height="458" rx="21" fill="none" stroke="#2b3b51"/>
-
-  <g class="mono">
-    <text x="44" y="48" fill="#c4b5fd" font-size="24" font-weight="900">CONTRIBUTION MINEFIELD</text>
-    <text x="44" y="76" fill="#64748b" font-size="14">AUTO-GENERATED FROM PUBLIC GITHUB ACTIVITY</text>
-
-    <g transform="translate(650 25)">
-      <rect width="150" height="61" rx="11" fill="#111827" stroke="#334155"/>
-      <text x="16" y="23" fill="#64748b" font-size="11" font-weight="700">MINES LEFT</text>
-      {counter_markup}
-      <text x="16" y="49" class="counter-reduced" fill="#4ade80" font-size="24" font-weight="900" opacity="0">000</text>
-      <rect x="164" width="150" height="61" rx="11" fill="#111827" stroke="#334155"/>
-      <text x="180" y="23" fill="#64748b" font-size="11" font-weight="700">MERGED</text>
-      <text x="180" y="49" fill="#4ade80" font-size="24" font-weight="900">{metrics.merged_prs:03d}</text>
-      <rect x="328" width="174" height="61" rx="11" fill="#111827" stroke="#334155"/>
-      <text x="344" y="23" fill="#64748b" font-size="11" font-weight="700">CONTRIBUTIONS</text>
-      <text x="344" y="49" fill="#22d3ee" font-size="24" font-weight="900">{metrics.contributions:04d}</text>
-    </g>
-
-    {status_markup}
-    <text x="44" y="121" class="reduced-win" fill="#4ade80" font-size="15" font-weight="700" opacity="0">&gt; FIELD CLEARED // KEEP SHIPPING</text>
-  </g>
-
-  <path class="route" d="{route_path}" fill="none" stroke="#22d3ee" stroke-opacity=".12" stroke-width="2"/>
+  <rect class="background" width="1200" height="310" rx="6"/>
+  <rect class="frame" x=".5" y=".5" width="1199" height="309" rx="5.5"/>
+  <path class="route" d="{route_path}" fill="none" stroke-opacity=".1" stroke-width="2"/>
   {"".join(cells)}
   {danger_pulse}
   {"".join(click_pulses)}
   {"".join(flag_pulses)}
 
-  <rect class="pulse" x="5" y="5" width="1190" height="450" rx="18" fill="none" stroke="#4ade80" stroke-width="3" opacity="0">
+  <rect class="pulse win-pulse" x="3" y="3" width="1194" height="304" rx="5" fill="none" stroke-width="3" opacity="0">
     <animate attributeName="opacity" values="0;0;1;.25;0;0" keyTimes="{animation_times(0, 16.45, 16.7, 20.4, 20.8, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>
   </rect>
   {"".join(confetti)}
 
-  <g class="player" filter="url(#cursorGlow)">
-    <circle class="player-core" r="17" fill="#22d3ee" fill-opacity=".14" stroke="#22d3ee" stroke-width="2"/>
-    <path d="M-8-13v26l7-7 7 14 7-4-7-13h11z" fill="#f8fafc" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/>
-    <circle r="3.5" fill="#4ade80"/>
+  <g class="player">
+    <circle class="player-core" r="17" fill-opacity=".12" stroke-width="2"/>
+    <path class="player-pointer" d="M-8-13v26l7-7 7 14 7-4-7-13h11z" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle class="player-dot" r="3.5"/>
     <animateTransform attributeName="transform" type="translate" values="{route_values}" keyTimes="{animation_times(*route_times)}" dur="{cycle:g}s" repeatCount="indefinite"/>
   </g>
-  <text x="600" y="431" text-anchor="middle" class="mono" fill="#64748b" font-size="13">Every safe click is a test. Every cleared field is a merge.</text>
 </svg>
 '''
 
