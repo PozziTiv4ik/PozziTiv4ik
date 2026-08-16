@@ -238,8 +238,9 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     cols, rows = 28, 7
     cell, gap = 31, 4
     board_width = cols * cell + (cols - 1) * gap
-    board_x = (1200 - board_width) // 2
-    board_y = 32
+    board_height = rows * cell + (rows - 1) * gap
+    board_x = 0
+    board_y = 0
     mine_count = min(34, max(18, metrics.merged_prs + metrics.active_days + 12))
     mines = mine_positions(
         cols, rows, mine_count, f"{USERNAME}:{datetime.now(UTC).year}"
@@ -250,6 +251,14 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
         return (
             board_x + x * (cell + gap) + cell / 2,
             board_y + y * (cell + gap) + cell / 2,
+        )
+
+    def cursor_position(point: tuple[int, int]) -> tuple[float, float]:
+        x, y = point_position(point)
+        margin = 22
+        return (
+            min(board_width - margin, max(margin, x)),
+            min(board_height - margin, max(margin, y)),
         )
 
     def animation_times(*seconds: float) -> str:
@@ -409,24 +418,24 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     )
 
     route_points = [
-        (board_x - 55, board_y - 38),
-        point_position(click_cells[0]),
-        point_position(click_cells[0]),
-        point_position(flag_cells[0]),
-        point_position(flag_cells[0]),
-        point_position(click_cells[1]),
-        point_position(click_cells[1]),
-        point_position(flag_cells[1]),
-        point_position(flag_cells[1]),
-        point_position(danger_cell),
-        point_position(danger_cell),
-        point_position(danger_cell),
-        point_position(click_cells[2]),
-        point_position(click_cells[2]),
-        (board_x + board_width + 45, board_y + rows * (cell + gap) - 20),
-        (board_x + board_width + 70, board_y - 40),
-        (board_x + board_width + 70, board_y - 40),
-        (board_x - 55, board_y - 38),
+        (22, 22),
+        cursor_position(click_cells[0]),
+        cursor_position(click_cells[0]),
+        cursor_position(flag_cells[0]),
+        cursor_position(flag_cells[0]),
+        cursor_position(click_cells[1]),
+        cursor_position(click_cells[1]),
+        cursor_position(flag_cells[1]),
+        cursor_position(flag_cells[1]),
+        cursor_position(danger_cell),
+        cursor_position(danger_cell),
+        cursor_position(danger_cell),
+        cursor_position(click_cells[2]),
+        cursor_position(click_cells[2]),
+        (board_width - 22, board_height - 22),
+        (board_width - 22, 22),
+        (board_width - 22, 22),
+        (22, 22),
     ]
     route_times = (
         0,
@@ -456,7 +465,7 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     confetti_colors = ("#3fb950", "#58a6ff", "#a371f7", "#d29922", "#f85149")
     confetti: list[str] = []
     for index in range(30):
-        x = confetti_rng.randint(30, 1170)
+        x = confetti_rng.randint(10, board_width - 10)
         start = 16.3 + confetti_rng.random() * 0.9
         end = 20.5 + confetti_rng.random() * 0.35
         width = confetti_rng.randint(4, 9)
@@ -464,7 +473,7 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
         color = confetti_colors[index % len(confetti_colors)]
         confetti.append(
             f'<rect class="confetti" x="{x}" y="-18" width="{width}" height="{height}" rx="2" fill="{color}" opacity="0">'
-            '<animate attributeName="y" values="-18;-18;300;300" '
+            f'<animate attributeName="y" values="-18;-18;{board_height};{board_height}" '
             f'keyTimes="{animation_times(0, start, end, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
             '<animate attributeName="opacity" values="0;0;1;0;0" '
             f'keyTimes="{animation_times(0, start, start + 0.18, end, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>'
@@ -475,13 +484,11 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
         f"A cursor plays an animated Minesweeper round generated from {metrics.contributions} public contributions, "
         f"{metrics.merged_prs} merged pull requests, and {metrics.active_days} active contribution days."
     )
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="310" viewBox="0 0 1200 310" role="img" aria-labelledby="title desc">
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{board_width}" height="{board_height}" viewBox="0 0 {board_width} {board_height}" role="img" aria-labelledby="title desc">
   <title id="title">{USERNAME}'s contribution minefield</title>
   <desc id="desc">{html.escape(description)}</desc>
   <style>
     :root{{color-scheme:light dark}}
-    .background{{fill:#ffffff}}
-    .frame{{fill:none;stroke:#d0d7de}}
     .number{{font:600 17px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
     .open-cell{{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1}}
     .cover,.mine-cover{{fill:#d8dee4;stroke:#afb8c1;stroke-width:1}}
@@ -490,7 +497,6 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     .flag-cloth{{fill:#1a7f37;stroke:#1a7f37}}.flag-pole{{stroke:#1a7f37}}
     .click-pulse{{stroke:#0969da}}.flag-pulse{{fill:#1a7f37}}
     .danger-pulse{{fill:#cf222e;stroke:#cf222e}}
-    .win-pulse{{stroke:#1a7f37}}
     .route{{stroke:#0969da}}
     .player-core{{fill:#0969da;stroke:#0969da}}
     .player-pointer{{fill:#ffffff;stroke:#0969da}}
@@ -500,14 +506,13 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
     @keyframes playerPulse{{from{{opacity:.55}}to{{opacity:1}}}}
     @keyframes routeFlow{{to{{stroke-dashoffset:-38}}}}
     @media(prefers-color-scheme:dark){{
-      .background{{fill:#0d1117}}.frame{{stroke:#30363d}}
       .open-cell{{fill:#161b22;stroke:#30363d}}
       .cover,.mine-cover{{fill:#21262d;stroke:#30363d}}
       .n1{{fill:#58a6ff}}.n2{{fill:#3fb950}}.n3{{fill:#f85149}}.n4{{fill:#a371f7}}
       .n5{{fill:#d29922}}.n6{{fill:#39c5cf}}.n7{{fill:#f0f6fc}}.n8{{fill:#8b949e}}
       .flag-cloth{{fill:#3fb950;stroke:#3fb950}}.flag-pole{{stroke:#3fb950}}
       .click-pulse{{stroke:#58a6ff}}.flag-pulse{{fill:#3fb950}}
-      .danger-pulse{{fill:#f85149;stroke:#f85149}}.win-pulse{{stroke:#3fb950}}
+      .danger-pulse{{fill:#f85149;stroke:#f85149}}
       .route{{stroke:#58a6ff}}.player-core{{fill:#58a6ff;stroke:#58a6ff}}
       .player-pointer{{fill:#f0f6fc;stroke:#58a6ff}}.player-dot{{fill:#3fb950}}
     }}
@@ -516,17 +521,12 @@ def render_minesweeper_svg(metrics: Metrics) -> str:
       .player,.pulse,.confetti,.route{{display:none}}
     }}
   </style>
-  <rect class="background" width="1200" height="310" rx="6"/>
-  <rect class="frame" x=".5" y=".5" width="1199" height="309" rx="5.5"/>
   <path class="route" d="{route_path}" fill="none" stroke-opacity=".1" stroke-width="2"/>
   {"".join(cells)}
   {danger_pulse}
   {"".join(click_pulses)}
   {"".join(flag_pulses)}
 
-  <rect class="pulse win-pulse" x="3" y="3" width="1194" height="304" rx="5" fill="none" stroke-width="3" opacity="0">
-    <animate attributeName="opacity" values="0;0;1;.25;0;0" keyTimes="{animation_times(0, 16.45, 16.7, 20.4, 20.8, cycle)}" dur="{cycle:g}s" repeatCount="indefinite"/>
-  </rect>
   {"".join(confetti)}
 
   <g class="player">
