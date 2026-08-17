@@ -28,6 +28,8 @@ I build developer tools, learn in public, and contribute focused changes to open
 
 | Project | Merged contribution | Date |
 |---|---|---:|
+| [sbryngelson/ANEForge](https://github.com/sbryngelson/ANEForge) | [models: add decoded GPT-2 generation helper](https://github.com/sbryngelson/ANEForge/pull/221) | 2026-08-16 |
+| [asheshgoplani/agent-deck](https://github.com/asheshgoplani/agent-deck) | [feat(notifications): add Linux notify-send backend](https://github.com/asheshgoplani/agent-deck/pull/1951) | 2026-08-16 |
 | [mloda-ai/mloda](https://github.com/mloda-ai/mloda) | [test: cover execution plan error branches](https://github.com/mloda-ai/mloda/pull/1133) | 2026-08-16 |
 | [wingfoil-io/wingfoil](https://github.com/wingfoil-io/wingfoil) | [feat(ops): add skip combinator](https://github.com/wingfoil-io/wingfoil/pull/846) | 2026-08-15 |
 | [bruits/satteri](https://github.com/bruits/satteri) | [test(parser): lock blockquote child positions](https://github.com/bruits/satteri/pull/247) | 2026-08-15 |
