@@ -28,6 +28,7 @@ I build developer tools, learn in public, and contribute focused changes to open
 
 | Project | Merged contribution | Date |
 |---|---|---:|
+| [DjangoCRM/django-crm](https://github.com/DjangoCRM/django-crm) | [fix: show CC for incoming inline emails](https://github.com/DjangoCRM/django-crm/pull/503) | 2026-08-20 |
 | [sbryngelson/ANEForge](https://github.com/sbryngelson/ANEForge) | [models: add decoded GPT-2 generation helper](https://github.com/sbryngelson/ANEForge/pull/221) | 2026-08-16 |
 | [asheshgoplani/agent-deck](https://github.com/asheshgoplani/agent-deck) | [feat(notifications): add Linux notify-send backend](https://github.com/asheshgoplani/agent-deck/pull/1951) | 2026-08-16 |
 | [mloda-ai/mloda](https://github.com/mloda-ai/mloda) | [test: cover execution plan error branches](https://github.com/mloda-ai/mloda/pull/1133) | 2026-08-16 |
